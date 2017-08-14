@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+version = '1.0 (2017-08-14)'
+
+import argparse
+from sys import stdout
+from os import walk
+from os.path import splitext, getsize, join
+import gzip
+import hashlib
+import json
+parser = argparse.ArgumentParser(description='Generate identification data for FASTQ files')
+parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
+parser.add_argument('-w', '--warnings', dest='warnings', action='store_true', default=False, help='show directory access warnings')
+parser.add_argument('-r', '--recursive', dest='recursive', action='store_true', default=False, help='recursively search folders')
+parser.add_argument('-l', '--follow-links', dest='links', action='store_true', default=False, help='follow links (if running recursively)')
+parser.add_argument('-j', '--json', dest='json', action='store_true', default=False, help='genrate output in JSON format')
+parser.add_argument('-c', '--checksum', dest='checksum', action='store_true', default=False, help='generate file checksums')
+parser.add_argument('-e', '--extension', dest='extensions', action='append', help='file extensions to search')
+parser.add_argument(dest='locations', metavar='<directory>', nargs='*', default=['.'], help='folder(s) to search')
+args = parser.parse_args()
+
+# Add the defualt file types if none have been specified:
+if args.extensions is None: args.extensions = ['.fastq', '.fastq.gz']
+
+# Define the warning functions:
+if args.warnings is True:
+    def warn_fun(err): print(err)
+else:
+    def warn_fun(err): pass
+
+# A function to get a file's size:
+def getSize(fname):
+    try: return getsize(f_path)
+    except (KeyboardInterrupt, SystemExit): raise
+    except: return '-'
+
+# A function to generate a file MD5 checksum:
+def getMD5(fname):
+    if args.checksum is False: return '-'
+    try:
+        md5 = hashlib.md5()
+        with open(fname, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b''): md5.update(chunk)
+        return md5.hexdigest()
+    except (KeyboardInterrupt, SystemExit): raise
+    except: return '-'
+    
+# A function to return the first (header) line of a FASTQ or FASTQ.GZ file:
+def getHeader(fname):
+    # Attempt to open file as gzipped:
+    try:
+        with gzip.open(fname, 'rb') as handle:
+            header = handle.readline().decode('ASCII').strip()
+        return header
+    except (KeyboardInterrupt, SystemExit): raise
+    except: pass
+    # If that failed, try again as a plain file:
+    try:
+        with open(fname, 'rb') as handle:
+            header = handle.readline().decode('ASCII').strip()
+        return header
+    except (KeyboardInterrupt, SystemExit): raise
+    except: return '-'
+
+# A function to output the data:
+def writeOutput(d):
+    if args.json is False: print('{dir}\t{name}\t{type}\t{size}\t{checksum}\t{header}'.format(**d), file=stdout, flush=True)
+    else: print('\t{}'.format(json.dumps(d)), file=stdout, flush=True)
+
+# Initialise the output:
+if args.json is True: print('[', file=stdout, flush=True)
+    
+# Iterate through the input folders:
+for input_location in args.locations:
+    for root, subdirs, files in walk(input_location, topdown=True, followlinks=args.links, onerror=warn_fun):
+        try:
+            # Prevent recursion, if necessary:
+            if args.recursive is False:
+                while len(subdirs) > 0: subdirs.pop()
+            # Go through the remaining files, checking them:
+            for f in files:
+                for ext in args.extensions:
+                    if f.endswith(ext):
+                        # The file has the relevant extension, so should be processed:
+                        f_path = join(root, f)
+                        file_data = {'dir':root, 'name':f, 'type':ext}
+                        file_data['size'] = getSize(f_path)
+                        file_data['checksum'] = getMD5(f_path)
+                        file_data['header'] = getHeader(f_path)
+                        writeOutput(file_data)
+        except (KeyboardInterrupt, SystemExit): break
+
+# Close the output:
+if args.json is True: print(']', file=stdout, flush=True)
