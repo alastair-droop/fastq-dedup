@@ -12,7 +12,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-version = '1.0 (2017-08-14)'
+version = '1.1 (2017-11-10)'
 
 import argparse
 from sys import stdout
@@ -21,10 +21,13 @@ from os.path import splitext, getsize, join
 import gzip
 import hashlib
 import json
+import logging
+
 parser = argparse.ArgumentParser(description='Generate identification data for FASTQ files')
 parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
-parser.add_argument('-w', '--warnings', dest='warnings', action='store_true', default=False, help='show directory access warnings')
+parser.add_argument('-V', '--verbose', dest='verbosity_level', default='error', choices=['error', 'warning', 'info'], help='Set logging level')
 parser.add_argument('-r', '--recursive', dest='recursive', action='store_true', default=False, help='recursively search folders')
+parser.add_argument('-n', '--no-header', dest='no_header', action='store_true', default=False, help='write column headers (when not returning JSON)')
 parser.add_argument('-l', '--follow-links', dest='links', action='store_true', default=False, help='follow links (if running recursively)')
 parser.add_argument('-j', '--json', dest='json', action='store_true', default=False, help='genrate output in JSON format')
 parser.add_argument('-c', '--checksum', dest='checksum', action='store_true', default=False, help='generate file checksums')
@@ -35,11 +38,16 @@ args = parser.parse_args()
 # Add the defualt file types if none have been specified:
 if args.extensions is None: args.extensions = ['.fastq', '.fastq.gz']
 
+# Set up logging based on the verbosity level set by the command line arguments:
+log = logging.getLogger()
+log_handler = logging.StreamHandler()
+log.default_msec_format = ''
+log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+log.setLevel(args.verbosity_level.upper())
+log.addHandler(log_handler)
+
 # Define the warning functions:
-if args.warnings is True:
-    def warn_fun(err): print(err)
-else:
-    def warn_fun(err): pass
+def warn_fun(err): log.warning('failed to analyse directory: "{}"'.format(err))
 
 # A function to get a file's size:
 def getSize(fname):
@@ -57,7 +65,7 @@ def getMD5(fname):
         return md5.hexdigest()
     except (KeyboardInterrupt, SystemExit): raise
     except: return '-'
-    
+
 # A function to return the first (header) line of a FASTQ or FASTQ.GZ file:
 def getHeader(fname):
     # Attempt to open file as gzipped:
@@ -75,15 +83,10 @@ def getHeader(fname):
     except (KeyboardInterrupt, SystemExit): raise
     except: return '-'
 
-# A function to output the data:
-def writeOutput(d):
-    if args.json is False: print('{dir}\t{name}\t{type}\t{size}\t{checksum}\t{header}'.format(**d), file=stdout, flush=True)
-    else: print('\t{}'.format(json.dumps(d)), file=stdout, flush=True)
+# Create an output dictionary:
+output = []
 
-# Initialise the output:
-if args.json is True: print('[', file=stdout, flush=True)
-    
-# Iterate through the input folders:
+# Iterate through the input folders, building up the output data:
 for input_location in args.locations:
     for root, subdirs, files in walk(input_location, topdown=True, followlinks=args.links, onerror=warn_fun):
         try:
@@ -100,8 +103,12 @@ for input_location in args.locations:
                         file_data['size'] = getSize(f_path)
                         file_data['checksum'] = getMD5(f_path)
                         file_data['header'] = getHeader(f_path)
-                        writeOutput(file_data)
-        except (KeyboardInterrupt, SystemExit): break
+                        output.append(file_data)
+        except (KeyboardInterrupt, SystemExit): raise
 
-# Close the output:
-if args.json is True: print(']', file=stdout, flush=True)
+# Print out the data:
+if args.json is False:
+    if args.no_header is False: print('dir\tname\ttype\tsize\tchecksum\theader', file=stdout)
+    for i in output:
+        print('{dir}\t{name}\t{type}\t{size}\t{checksum}\t{header}'.format(**i), file=stdout)
+else: print(json.dumps(output, indent='\t'), file=stdout)
