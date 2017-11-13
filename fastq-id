@@ -28,7 +28,7 @@ parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.
 parser.add_argument('-V', '--verbose', dest='verbosity_level', default='error', choices=['error', 'warning', 'info', 'debug'], help='Set logging level')
 parser.add_argument('-r', '--recursive', dest='recursive', action='store_true', default=False, help='recursively search folders')
 parser.add_argument('-l', '--follow-links', dest='links', action='store_true', default=False, help='follow links (if running recursively)')
-parser.add_argument('-c', '--checksum', dest='checksum', action='store_true', default=False, help='generate file checksums')
+parser.add_argument('-c', '--checksum', dest='checksum', action='store_true', default=False, help='generate file checksums & decompressed size')
 parser.add_argument('-e', '--extension', dest='extensions', action='append', help='file extensions to search')
 parser.add_argument('-b', '--md5-block-size', dest='block_size', type=int, default=4096, help='file block size for calculating checksums')
 parser.add_argument('-o', '--output-file', dest='output_file', type=argparse.FileType('wt'), default=stdout, help='output file')
@@ -79,28 +79,31 @@ def getHandle(filename):
 def warn_fun(err): log.warning('failed to process directory: "{}"'.format(err))
 
 # A function to get a file's size:
-def getSize(filename):
-    log.debug('attempting to determine file size for file "{}"'.format(filename))
+def getDiskSize(filename):
+    log.debug('attempting to determine file disk size for file "{}"'.format(filename))
     try: return getsize(filename)
     except (KeyboardInterrupt, SystemExit): raise
     except:
-        log.warning('failed to determine file size for file "{}"'.format(filename))
+        log.warning('failed to determine file disk size for file "{}"'.format(filename))
         return None
 
 # A function to generate a fastq file (decompressed) MD5 checksum:
 def getMD5(handle):
-    if args.checksum is not True: return None
-    if handle is None: return None
+    if args.checksum is not True: return (None, None)
+    if handle is None: return (None, None)
     log.debug('attempting to determine uncompressed MD5 for file "{}"'.format(handle.name))
     try:
         md5 = hashlib.md5()
+        size = 0
         handle.seek(0)
-        for chunk in iter(lambda: handle.read(args.block_size), b''): md5.update(chunk)
-        return md5.hexdigest()
+        for chunk in iter(lambda: handle.read(args.block_size), b''):
+            md5.update(chunk)
+            size += len(chunk)
+        return (size, md5.hexdigest())
     except (KeyboardInterrupt, SystemExit): raise
     except:
         log.warning('failed to determine uncompressed MD5 for file "{}"'.format(filename))
-        return None
+        return (None, None)
 
 # A function to return the first (header) line of a FASTQ or FASTQ.GZ file:
 def getHeader(handle):
@@ -145,9 +148,11 @@ for input_location in args.locations:
                         # The file has the relevant extension, so should be processed:
                         f_path = join(root, f)
                         f_handle = getHandle(f_path)
+                        f_data = getMD5(f_handle[0])
                         file_data = {'dir':root, 'name':f, 'format':f_handle[1]}
-                        file_data['size'] = getSize(f_path)
-                        file_data['checksum'] = getMD5(f_handle[0])
+                        file_data['disk'] = getDiskSize(f_path)
+                        file_data['size'] = f_data[0]
+                        file_data['checksum'] = f_data[1]
                         file_data['header'] = getHeader(f_handle[0])
                         output.append(file_data)
         except (KeyboardInterrupt, SystemExit): raise
