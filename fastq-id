@@ -27,9 +27,7 @@ parser = argparse.ArgumentParser(description='Generate identification data for F
 parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
 parser.add_argument('-V', '--verbose', dest='verbosity_level', default='error', choices=['error', 'warning', 'info', 'debug'], help='Set logging level')
 parser.add_argument('-r', '--recursive', dest='recursive', action='store_true', default=False, help='recursively search folders')
-parser.add_argument('-n', '--no-header', dest='no_header', action='store_true', default=False, help='write column headers (when not returning JSON)')
 parser.add_argument('-l', '--follow-links', dest='links', action='store_true', default=False, help='follow links (if running recursively)')
-parser.add_argument('-j', '--json', dest='json', action='store_true', default=False, help='genrate output in JSON format')
 parser.add_argument('-c', '--checksum', dest='checksum', action='store_true', default=False, help='generate file checksums')
 parser.add_argument('-e', '--extension', dest='extensions', action='append', help='file extensions to search')
 parser.add_argument('-b', '--md5-block-size', dest='block_size', type=int, default=4096, help='file block size for calculating checksums')
@@ -49,7 +47,7 @@ log.setLevel(args.verbosity_level.upper())
 log.addHandler(log_handler)
 
 def getHandle(filename):
-    log.info('attempting to open file "{}"'.format(filename))
+    log.debug('attempting to open file "{}"'.format(filename))
     #First, try to open as a fastq.gz file:
     try:
         handle = gzip.open(filename, 'rb')
@@ -78,7 +76,7 @@ def getHandle(filename):
         return (None, None)
 
 # Define the warning functions:
-def warn_fun(err): log.warning('failed to analyse directory: "{}"'.format(err))
+def warn_fun(err): log.warning('failed to process directory: "{}"'.format(err))
 
 # A function to get a file's size:
 def getSize(filename):
@@ -93,7 +91,7 @@ def getSize(filename):
 def getMD5(handle):
     if args.checksum is not True: return None
     if handle is None: return None
-    log.info('attempting to determine uncompressed MD5 for file "{}"'.format(handle.name))
+    log.debug('attempting to determine uncompressed MD5 for file "{}"'.format(handle.name))
     try:
         md5 = hashlib.md5()
         handle.seek(0)
@@ -107,7 +105,7 @@ def getMD5(handle):
 # A function to return the first (header) line of a FASTQ or FASTQ.GZ file:
 def getHeader(handle):
     if handle is None: return None
-    log.info('attempting to determine initial read header for file "{}"'.format(handle.name))
+    log.debug('attempting to determine initial read header for file "{}"'.format(handle.name))
     try:
         handle.seek(0)
         return handle.readline().decode('ASCII').strip()
@@ -116,6 +114,18 @@ def getHeader(handle):
         log.warning('failed to determine initial read header for file "{}"'.format(filename))
         return None
 
+# Output the run settings:
+log.debug('testing files with extensions: "{}"'.format('", "'.join(args.extensions)))
+if args.checksum is True: log.debug('generating MD5 checksums with blocksize of {} bytes'.format(args.block_size))
+else: log.debug('skipping MD5 checksums')
+if args.recursive is True:
+    log.debug('recursively checking subfolders')
+    if args.links is True: log.debug('following links')
+    else: log.debug('not following links')
+else:
+    log.debug('not recursively checking subfolders')
+    log.debug('not following links (not recursive)')
+
 # Create an output dictionary:
 output = []
 
@@ -123,12 +133,13 @@ output = []
 for input_location in args.locations:
     for root, subdirs, files in walk(input_location, topdown=True, followlinks=args.links, onerror=warn_fun):
         try:
-            log.info('processing folder "{}"'.format(root))
+            log.info('processing directory "{}"'.format(root))
             # Prevent recursion, if necessary:
             if args.recursive is False:
                 while len(subdirs) > 0: subdirs.pop()
             # Go through the remaining files, checking them:
             for f in files:
+                log.debug('processing file "{}"'.format(f))
                 for ext in args.extensions:
                     if f.endswith(ext):
                         # The file has the relevant extension, so should be processed:
@@ -142,8 +153,5 @@ for input_location in args.locations:
         except (KeyboardInterrupt, SystemExit): raise
 
 # Print out the data:
-if args.json is False:
-    if args.no_header is False: print('dir\tname\tformat\tsize\tchecksum\theader', file=args.output_file)
-    for i in output:
-        print('{dir}\t{name}\t{type}\t{size}\t{checksum}\t{header}'.format(**i), file=args.output_file)
-else: print(json.dumps(output, indent='\t'), file=args.output_file)
+log.debug('writing output data to file "{}"'.format(args.output_file.name))
+print(json.dumps(output, indent='\t'), file=args.output_file)
