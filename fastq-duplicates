@@ -39,7 +39,7 @@ def writeDuplicateBlocks(d, dup_type, certainty):
     for i in d[dup_type].keys():
         paths = d[dup_type][i]
         if len(paths) > 1:
-            print('{}\t{}\t{}\t({})'.format(certainty, dup_type, i, ', '.join(paths)), file=args.output_file)
+            print('{}\t{}\t{}\t{}\t{}'.format(certainty, dup_type, len(paths), i, ', '.join(paths)), file=args.output_file)
 
 
 # Set up logging based on the verbosity level set by the command line arguments:
