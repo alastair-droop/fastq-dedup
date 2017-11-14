@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 
-version = '1.1b (2017-11-13)'
+version = '1.2 (2017-11-14)'
 
 import argparse
 from sys import stdin, stdout, exit
@@ -48,7 +48,7 @@ def writeDuplicateBlocks(d, dup_type, certainty):
 log = logging.getLogger()
 log_handler = logging.StreamHandler()
 log.default_msec_format = ''
-log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+log_handler.setFormatter(logging.Formatter('[%(asctime)s.%(msecs)03d] %(levelname)s: %(message)s', '%Y-%m-%d %H:%M:%S'))
 log.setLevel(args.verbosity_level.upper())
 log.addHandler(log_handler)
 

@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 
-version = '1.1b (2017-11-13)'
+version = '1.2 (2017-11-14)'
 
 import argparse
 from sys import stdout
@@ -44,7 +44,7 @@ if args.extensions is None: args.extensions = ['.fastq', '.fastq.gz']
 log = logging.getLogger()
 log_handler = logging.StreamHandler()
 log.default_msec_format = ''
-log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+log_handler.setFormatter(logging.Formatter('[%(asctime)s.%(msecs)03d] %(levelname)s: %(message)s', '%Y-%m-%d %H:%M:%S'))
 log.setLevel(args.verbosity_level.upper())
 log.addHandler(log_handler)
 
@@ -104,7 +104,7 @@ def getMD5(handle):
         return (size, md5.hexdigest())
     except (KeyboardInterrupt, SystemExit): raise
     except:
-        log.warning('failed to determine uncompressed MD5 for file "{}"'.format(filename))
+        log.warning('failed to determine uncompressed MD5 for file "{}"'.format(handle.name))
         return (None, None)
 
 # A function to return the first (header) line of a FASTQ or FASTQ.GZ file:
@@ -116,7 +116,7 @@ def getHeader(handle):
         return handle.readline().decode('ASCII').strip()
     except (KeyboardInterrupt, SystemExit): raise
     except:
-        log.warning('failed to determine initial read header for file "{}"'.format(filename))
+        log.warning('failed to determine initial read header for file "{}"'.format(handle.name))
         return None
 
 # Output the run settings:
