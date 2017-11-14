@@ -1,4 +1,4 @@
-#FASTQ File Deduplication
+# FASTQ File Deduplication
 
 Thee scripts inspect a directory for all FASTQ files (compressed and uncompressed) to identify possible duplicates.
 
@@ -75,14 +75,14 @@ optional arguments:
 
 4 different grouping methods are performed:
 
-###Certain Duplicates
+### Certain Duplicates
 
 Files that share a decompressed `checksum` contain identical data and are therefore certainly duplicates.
 
-###Likely Duplicates
+### Likely Duplicates
 
 Files that share (`size` and `header`) or (`disk` and `header`) are likely duplicated (as they have the same first read which should limit to the same flowcell, lane, index and pair, and are the same size on disk). Both comparisons are performed, so that we are able to identify likely duplicates in the absence of `checksum` and `uncompressed` data, (which are very slow to compute).
 
-###Possible Duplicates
+### Possible Duplicates
 
 Files that share the same `header` are possible duplicates, although care must be taken here as FASTQ processing methods often yield files with read headers unchanged.
