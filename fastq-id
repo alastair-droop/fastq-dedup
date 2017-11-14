@@ -157,7 +157,7 @@ for input_location in args.locations:
                         file_data['checksum'] = f_data[1]
                         file_data['header'] = getHeader(f_handle[0])
                         output.append(file_data)
-            			log.debug('file "{}": {}'.format(f, 'dir: {dir}; format: {format}; disk: {disk}; size: {size}; checksum: {checksum}; header: {header}'.format(**file_data)))
+                        log.debug('file "{}": {}'.format(f, 'dir: {dir}; format: {format}; disk: {disk}; size: {size}; checksum: {checksum}; header: {header}'.format(**file_data)))
         except (KeyboardInterrupt, SystemExit): raise
 
 # Print out the data:
